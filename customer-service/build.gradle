@@ -1,12 +1,19 @@
 plugins {
-	id 'org.springframework.boot' version '2.7.1'
+	id "com.github.spacialcircumstances.gradle-cucumber-reporting" version "0.1.24"
 	id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+	id 'jacoco'
 	id 'java'
+	id 'jvm-test-suite'
+	id 'org.springframework.boot' version '2.7.1'
 }
 
 group = 'bdd.microservices'
 version = '0.0.1-SNAPSHOT'
 sourceCompatibility = '17'
+
+def versions = [
+		cucumber: '7.4.1'
+]
 
 configurations {
 	compileOnly {
@@ -19,15 +26,91 @@ repositories {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-web'
+	annotationProcessor 'org.projectlombok:lombok'
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	
+    // Runtime only dependencies
 	runtimeOnly 'com.h2database:h2'
-	annotationProcessor 'org.projectlombok:lombok'
+	
+    // Unit test dependencies
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+/*
+    // Integration test dependencoes
+    testIntImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // Cucumber dependencies
+	testIntImplementation platform("io.cucumber:cucumber-bom:${versions.cucumber}")
+	testIntImplementation "io.cucumber:cucumber-java"
+	testIntImplementation "io.cucumber:cucumber-junit-platform-engine"
+	testIntImplementation "io.cucumber:cucumber-spring"
+
+    // Need junit-platform-suite to run cucumber tests. see RunCucumberTest
+	testIntImplementation "org.junit.platform:junit-platform-suite"
+
+    // Integration test dependencoes
+    implementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // Cucumber dependencies
+    implementation platform("io.cucumber:cucumber-bom:${versions.cucumber}")
+    implementation "io.cucumber:cucumber-java"
+    implementation "io.cucumber:cucumber-junit-platform-engine"
+    implementation "io.cucumber:cucumber-spring"
+
+    // Need junit-platform-suite to run cucumber tests. see RunCucumberTest
+    implementation "org.junit.platform:junit-platform-suite"
+*/
 }
 
-tasks.named('test') {
-	useJUnitPlatform()
+cucumberReports {
+	buildId = '0'
+	outputDir = file("${buildDir}/reports/cucumber")
+	reports = files("${buildDir}/reports/cucumber/cucumber-report.json")
 }
+
+testing {
+    suites { 
+        test { 
+            useJUnitJupiter() 
+        }
+
+        // https://docs.gradle.org/current/userguide/jvm_test_suite_plugin.html
+        testInt(JvmTestSuite) {
+            testType = TestSuiteType.INTEGRATION_TEST
+            dependencies {
+                implementation project
+                implementation 'org.springframework.boot:spring-boot-starter-test'
+                implementation project.dependencies.platform("io.cucumber:cucumber-bom:${versions.cucumber}")
+                //implementation platform("io.cucumber:cucumber-bom:7.4.1")
+                implementation "io.cucumber:cucumber-java"
+                implementation "io.cucumber:cucumber-junit-platform-engine"
+                implementation "io.cucumber:cucumber-spring"
+
+                implementation "org.junit.platform:junit-platform-suite"
+            }
+
+			sources { 
+                java { 
+                    srcDirs = ['src/testInt/java'] 
+                }
+            }
+
+            targets { 
+                all {
+                    testTask.configure {
+                        shouldRunAfter(test)
+                    }
+                }
+            }
+        }
+    }
+}
+
+tasks.named('check') { 
+    dependsOn(testing.suites.testInt)
+}
+
